@@ -1,19 +1,68 @@
 import streamlit as st
 import fitz  # PyMuPDF
 import chromadb
-from google.generativeai import GenerativeModel, configure
-from google.generativeai.types import Content
 import os
+from google import genai
+from google.genai import types
+
+from IPython.display import Markdown
+# genai.__version__
+
+import config.config as cfg
+
+#with open(pdf_path, "rb") as f:
+#    pdf_bytes = f.read()
 
 # Configure Gemini
-configure(api_key="YOUR_GEMINI_API_KEY")
-model = GenerativeModel('gemini-pro')
+GOOGLE_API_KEY = ""
+client = genai.Client(api_key=GOOGLE_API_KEY)
+for m in client.models.list():
+    if "embedContent" in m.supported_actions:
+        print(m.name)
 
-# Set up Chroma
-chroma_client = chromadb.Client()
-collection = chroma_client.get_or_create_collection("earthquake_docs")
+# Download documents 
+'''
+!wget -nv -O gemini.pdf https://storage.googleapis.com/cloud-samples-data/generative-ai/pdf/2403.05530.pdf
+document_eval_file = client.files.upload(file='gemini.pdf')
+!wget -nv -O Myanmar.pdf https://prddsgofilestorage.blob.core.windows.net/api/event-featured-documents/file/2025_IFRC_MYANMAR_EQ_DISASTER_BRIEF_24H_Low_Res.pdf
+document_sim_file = client.files.upload(file='Myanmar.pdf')
+!wget -nv -O Myanmar_SitRep.pdf https://www.unocha.org/attachments/2c9df378-1961-4841-bfea-2a37c31a5c9d/Myanmar%20Earthquake%20Situation%20Report%201_final.pdf 
+document_sitrep_file = client.files.upload(file='Myanmar_SitRep.pdf')
+!wget -nv -O EQ_Guidelines.pdf https://www.urban-response.org/system/files/content/resource/files/main/26164-earthquakeguidelinesenweb.pdf
+document_guide_file = client.files.upload(file='EQ_Guidelines.pdf')
+'''
 
-# ------------------- Utility Functions -------------------
+# Enter EQ details
+# Example
+location = 'Los Angeles'
+magnitude = 6.8
+population_density = 'high'
+time = '03:45 AM'
+
+# Simulate EQ scenarios based on given variables and documents
+def sim_scenario():
+    request = f"""
+    You're a crisis simulator. Create a realistic earthquake scenario based on:
+    Location: {location}
+    Magnitude: {magnitude}
+    Population Density: {population_density}
+    Time: {time}
+    """
+    model_config = types.GenerateContentConfig(temperature=0.1, top_p=0.95)
+
+    response = client.models.generate_content(
+        model='gemini-2.0-flash',
+        config=model_config,
+        contents=[request, cfg.document_sim_file]) #contents=[request] uncomment this for runnning without document
+
+    final_resp = response.text
+    # print(final_resp)
+    Markdown(final_resp)
+    # Set up Chroma
+    chroma_client = chromadb.Client()
+    collection = chroma_client.get_or_create_collection("earthquake_docs")
+
+# ------------------- RAG Functions -------------------
 def extract_text_from_pdf(file):
     doc = fitz.open(stream=file.read(), filetype="pdf")
     text = ""
